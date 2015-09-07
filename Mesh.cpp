@@ -97,6 +97,7 @@ void Mesh::computeFaceGradients(Eigen::MatrixXd& gradients, const Eigen::VectorX
         Eigen::Vector3d gradient;
         gradient.setZero();
         Eigen::Vector3d normal = f->normal();
+        normal.normalize();
         
         HalfEdgeCIter he = f->he;
         do {
