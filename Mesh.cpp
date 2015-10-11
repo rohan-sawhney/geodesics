@@ -1,15 +1,9 @@
 #include "Mesh.h"
 #include "MeshIO.h"
-#include <Eigen/SparseCholesky>
 
 Mesh::Mesh()
 {
     
-}
-
-Mesh::Mesh(const Mesh& mesh)
-{
-    *this = mesh;
 }
 
 bool Mesh::read(const std::string& fileName)
@@ -24,6 +18,7 @@ bool Mesh::read(const std::string& fileName)
     bool readSuccessful = false;
     if ((readSuccessful = MeshIO::read(in, *this))) {
         normalize();
+        setup();
     }
     
     return readSuccessful;
@@ -150,28 +145,35 @@ void Mesh::computeIntegratedDivergence(Eigen::VectorXd& integratedDivs,
     }
 }
 
-void Mesh::computeGeodesics(const int vIdx)
+void Mesh::setup()
 {
     int v = (int)vertices.size();
     
     // build Laplacian
     Eigen::SparseMatrix<double> L(v, v);
     buildLaplacian(L);
+    poissonSolver.compute(L);
     
     // build diagonal area matrix
     Eigen::SparseMatrix<double> A(v, v);
     buildAreaMatrix(A);
     
-    // set random point on mesh to 1
-    Eigen::VectorXd u(v);
-    u.setZero();
-    u(vIdx) = 1.0;
-    
     // compute time step
     double t = computeTimeStep();
     
     // 1. compute heat flow for time t
-    Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> heatSolver(A - t*L);
+    heatSolver.compute(A - t*L);
+}
+
+void Mesh::computeGeodesics(const int vIdx)
+{
+    int v = (int)vertices.size();
+    
+    // set random point on mesh to 1
+    Eigen::VectorXd u(v);
+    u.setZero();
+    u(vIdx) = 1.0;
+
     u = heatSolver.solve(u);
     
     // 2. evaluate face gradients
@@ -182,7 +184,6 @@ void Mesh::computeGeodesics(const int vIdx)
     Eigen::VectorXd integratedDivs(v);
     computeIntegratedDivergence(integratedDivs, gradients);
     
-    Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> poissonSolver(L);
     Eigen::VectorXd phis = poissonSolver.solve(integratedDivs);
     
     // compute max and min phis

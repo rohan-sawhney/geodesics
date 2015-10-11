@@ -7,14 +7,12 @@
 #include "Face.h"
 #include "HalfEdge.h"
 #include <Eigen/SparseCore>
+#include <Eigen/SparseCholesky>
 
 class Mesh {
 public:
     // default constructor
     Mesh();
-    
-    // copy constructor
-    Mesh(const Mesh& mesh);
         
     // read mesh from file
     bool read(const std::string& fileName);
@@ -53,6 +51,12 @@ private:
     
     // center mesh about origin and rescale to unit radius
     void normalize();
+    
+    // prefactors A - t*L
+    void setup();
+    
+    Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> heatSolver;
+    Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> poissonSolver;
 };
 
 #endif
