@@ -22,3 +22,15 @@ double Vertex::dualArea() const
     
     return area / 3.0;
 }
+
+bool Vertex::onBoundary() const
+{
+    HalfEdgeIter h = he;
+    do {
+        if (h->onBoundary) return true;
+        
+        h = h->flip->next;
+    } while (h != he);
+    
+    return false;
+}

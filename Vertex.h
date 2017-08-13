@@ -22,6 +22,8 @@ public:
     
     // returns area of barycentric dual cell associated with the vertex
     double dualArea() const;
+    
+    bool onBoundary() const;
 };
 
 #endif

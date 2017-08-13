@@ -88,26 +88,27 @@ double Mesh::computeTimeStep() const
 void Mesh::computeFaceGradients(Eigen::MatrixXd& gradients, const Eigen::VectorXd& u) const
 {
     for (FaceCIter f = faces.begin(); f != faces.end(); f++) {
-        
-        Eigen::Vector3d gradient;
-        gradient.setZero();
-        Eigen::Vector3d normal = f->normal();
-        normal.normalize();
-        
-        HalfEdgeCIter he = f->he;
-        do {
-            double ui = u(he->next->next->vertex->index);
-            Eigen::Vector3d ei = he->next->vertex->position - he->vertex->position;
+        if (!f->isBoundary()) {
+            Eigen::Vector3d gradient;
+            gradient.setZero();
+            Eigen::Vector3d normal = f->normal();
+            normal.normalize();
             
-            gradient += ui * normal.cross(ei);
+            HalfEdgeCIter he = f->he;
+            do {
+                double ui = u(he->next->next->vertex->index);
+                Eigen::Vector3d ei = he->next->vertex->position - he->vertex->position;
+                
+                gradient += ui * normal.cross(ei);
+                
+                he = he->next;
+            } while (he != f->he);
             
-            he = he->next;
-        } while (he != f->he);
-        
-        gradient /= (2.0 * f->area());
-        gradient.normalize();
-        
-        gradients.row(f->index) = -gradient;
+            gradient /= (2.0 * f->area());
+            gradient.normalize();
+            
+            gradients.row(f->index) = -gradient;
+        }
     }
 }
 
@@ -120,23 +121,25 @@ void Mesh::computeIntegratedDivergence(Eigen::VectorXd& integratedDivs,
         
         HalfEdgeCIter he = v->he;
         do {
-            Eigen::Vector3d gradient = gradients.row(he->face->index);
-            
-            Eigen::Vector3d p1 = he->next->vertex->position;
-            Eigen::Vector3d p2 = he->next->next->vertex->position;
-            
-            Eigen::Vector3d e1 = p1 - p;
-            Eigen::Vector3d e2 = p2 - p;
-            Eigen::Vector3d ei = p2 - p1;
-            
-            double theta1 = acos((-e2).dot(-ei) / (e2.norm() * ei.norm()));
-            double cot1 = 1.0 / tan(theta1);
-            
-            double theta2 = acos((-e1).dot(ei) / (e1.norm() * ei.norm()));
-            double cot2 = 1.0 / tan(theta2);
-            
-            integratedDiv += e1.dot(gradient) * cot1 + e2.dot(gradient) * cot2;
-            
+            if (!he->onBoundary) {
+                Eigen::Vector3d gradient = gradients.row(he->face->index);
+                
+                Eigen::Vector3d p1 = he->next->vertex->position;
+                Eigen::Vector3d p2 = he->next->next->vertex->position;
+                
+                Eigen::Vector3d e1 = p1 - p;
+                Eigen::Vector3d e2 = p2 - p;
+                Eigen::Vector3d ei = p2 - p1;
+                
+                double theta1 = acos((-e2).dot(-ei) / (e2.norm() * ei.norm()));
+                double cot1 = 1.0 / tan(theta1);
+                
+                double theta2 = acos((-e1).dot(ei) / (e1.norm() * ei.norm()));
+                double cot2 = 1.0 / tan(theta2);
+                
+                integratedDiv += e1.dot(gradient) * cot1 + e2.dot(gradient) * cot2;
+            }
+        
             he = he->flip->next;
             
         } while (he != v->he);
@@ -173,7 +176,7 @@ void Mesh::computeGeodesics(const int vIdx)
     Eigen::VectorXd u(v);
     u.setZero();
     u(vIdx) = 1.0;
-
+    
     u = heatSolver.solve(u);
     
     // 2. evaluate face gradients
